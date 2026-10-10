@@ -20,6 +20,34 @@ ARG JRE_RUNTIME_IMAGE=eclipse-temurin:21-jre-alpine
 # ---------------------------------------------------------------------------------------------
 FROM ${JDK_BUILD_IMAGE} AS build
 
+# Optional Maven mirror. Building from mainland China against Maven Central takes tens of
+# minutes; one build arg fixes it without changing anything else:
+#   docker build --build-arg MAVEN_CENTRAL_MIRROR=https://maven.aliyun.com/repository/public .
+# docker compose build --build-arg MAVEN_CENTRAL_MIRROR=...  (wired in deploy/docker-compose.yml)
+#
+# The settings file lives OUTSIDE /root/.m2 on purpose: that path is a BuildKit cache mount, so
+# anything written there before the mount is shadowed by the cache volume.
+ARG MAVEN_CENTRAL_MIRROR=""
+RUN mkdir -p /opt/maven \
+ && if [ -n "$MAVEN_CENTRAL_MIRROR" ]; then \
+        printf '%s\n' \
+          '<?xml version="1.0" encoding="UTF-8"?>' \
+          '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">' \
+          '  <mirrors>' \
+          '    <mirror>' \
+          '      <id>custom-mirror</id>' \
+          '      <mirrorOf>central</mirrorOf>' \
+          "      <url>${MAVEN_CENTRAL_MIRROR}</url>" \
+          '    </mirror>' \
+          '  </mirrors>' \
+          '</settings>' > /opt/maven/settings.xml ; \
+        echo "Maven mirror: $MAVEN_CENTRAL_MIRROR" ; \
+    else \
+        printf '%s\n' \
+          '<?xml version="1.0" encoding="UTF-8"?>' \
+          '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"/>' > /opt/maven/settings.xml ; \
+    fi
+
 WORKDIR /workspace
 
 # Copy every POM first. This layer only changes when a POM changes, so the slow dependency
@@ -37,7 +65,7 @@ COPY loomvault-server/pom.xml loomvault-server/pom.xml
 # resolves: `go-offline` cannot resolve inter-module references that have not been packaged yet,
 # whereas this run builds (empty) module artifacts inside the same reactor session.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -ntp -DskipTests -Dspring-boot.repackage.skip=true package
+    mvn -s /opt/maven/settings.xml -B -ntp -DskipTests -Dspring-boot.repackage.skip=true package
 
 # Now bring in the sources and build the real, executable jar.
 # <finalName> is `loomvault` (loomvault-server/pom.xml) -> loomvault-server/target/loomvault.jar
@@ -47,7 +75,7 @@ COPY loomvault-store/src  loomvault-store/src
 COPY loomvault-server/src loomvault-server/src
 
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -ntp -DskipTests package
+    mvn -s /opt/maven/settings.xml -B -ntp -DskipTests package
 
 # ---------------------------------------------------------------------------------------------
 # Stage 2 — runtime

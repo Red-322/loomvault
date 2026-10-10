@@ -68,6 +68,15 @@ docker compose up --build
 Open **http://localhost:8080** — three example workflows are registered and one demo run is
 already waiting for your approval. No API key, no configuration.
 
+> **Building from mainland China?** Pulling the base images and the Maven dependency tree can take
+> a very long time. The image build accepts a mirror argument:
+>
+> ```bash
+> MAVEN_CENTRAL_MIRROR=https://maven.aliyun.com/repository/public docker compose up --build
+> ```
+>
+> Dependencies are cached in a BuildKit cache mount, so only the first build pays the download.
+
 ### Local, zero dependencies
 
 ```bash

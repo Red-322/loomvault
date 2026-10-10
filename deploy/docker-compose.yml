@@ -59,6 +59,11 @@ services:
       # Context is the project root so every module (core/llm/store/server) is available.
       context: ..
       dockerfile: Dockerfile
+      args:
+        # Building from mainland China? Export this before `docker compose up --build`:
+        #   MAVEN_CENTRAL_MIRROR=https://maven.aliyun.com/repository/public
+        # It only affects the build stage; the runtime image is unaffected.
+        MAVEN_CENTRAL_MIRROR: ${MAVEN_CENTRAL_MIRROR:-}
     image: loomvault:latest
     # The app must exit cleanly on shutdown; only restart it after an actual failure.
     restart: on-failure
