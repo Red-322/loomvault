@@ -23,11 +23,15 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
-  # Redis is not used in this profile; the cache falls back to an in-process LRU.
-  data:
-    redis:
-      host: localhost
-      port: 6379
+  # Redis is not part of standalone mode: the response cache is a process-local LRU (see
+  # loomvault.cache.mode below). Excluding the autoconfiguration stops Spring from opening a
+  # connection at all — without this, every startup printed a multi-frame
+  # "Unable to connect to Redis ... Connection refused" stack trace that looked like a failure
+  # but was only the health probe noticing there is no Redis to probe.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
 
 loomvault:
   store:
@@ -43,6 +47,13 @@ loomvault:
       max-latency: 140ms
   engine:
     max-parallel-nodes: 4
+
+# Belt and braces: even if the autoconfiguration exclusions above are ever relaxed, the health
+# endpoint must not treat an unreachable Redis as a problem in a mode that does not use Redis.
+management:
+  health:
+    redis:
+      enabled: false
 
 logging:
   level:
