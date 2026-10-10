@@ -85,8 +85,8 @@ FROM ${JRE_RUNTIME_IMAGE} AS runtime
 # OCI image-spec annotations (title / source / license).
 LABEL org.opencontainers.image.title="LoomVault" \
       org.opencontainers.image.description="Durable, resumable, budget-aware execution engine for AI agent workflows." \
-      org.opencontainers.image.source="https://github.com/loomvault/loomvault" \
-      org.opencontainers.image.url="https://github.com/loomvault/loomvault" \
+      org.opencontainers.image.source="https://github.com/Red-322/loomvault" \
+      org.opencontainers.image.url="https://github.com/Red-322/loomvault" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 # Dedicated unprivileged account (uid/gid 10001) — never run the JVM as root.

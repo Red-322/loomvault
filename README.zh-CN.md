@@ -52,7 +52,7 @@
 ### Docker（PostgreSQL + Redis + 应用）
 
 ```bash
-git clone https://github.com/<your-account>/loomvault.git
+git clone https://github.com/Red-322/loomvault.git
 cd loomvault/deploy
 docker compose up --build
 ```
@@ -263,7 +263,7 @@ mvn verify        # 132 个测试
 3. 注释与提交信息请用英文。
 4. 保持 `loomvault-core` 不引入 Spring 和 JDBC。如果你需要一项新能力，在 `io.loomvault.core.port` 里加一个端口，然后在外层模块实现它。
 
-适合新手的 issue 打了 [`good first issue`](https://github.com/<your-account>/loomvault/labels/good%20first%20issue) 标签。
+适合新手的 issue 打了 [`good first issue`](https://github.com/Red-322/loomvault/labels/good%20first%20issue) 标签。
 
 ## 文档
 

@@ -60,7 +60,7 @@ its own log.
 ### Docker (PostgreSQL + Redis + app)
 
 ```bash
-git clone https://github.com/<your-account>/loomvault.git
+git clone https://github.com/Red-322/loomvault.git
 cd loomvault/deploy
 docker compose up --build
 ```
@@ -315,7 +315,7 @@ Issues and pull requests are welcome. Before opening a PR:
 4. Keep `loomvault-core` free of Spring and JDBC. If you need a new capability, add a port in
    `io.loomvault.core.port` and implement it in an outer module.
 
-Good first issues are labelled [`good first issue`](https://github.com/<your-account>/loomvault/labels/good%20first%20issue).
+Good first issues are labelled [`good first issue`](https://github.com/Red-322/loomvault/labels/good%20first%20issue).
 
 ## Documentation
 
