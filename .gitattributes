@@ -1,0 +1,18 @@
+# Normalise line endings in the repository, not on checkout.
+#
+# The Maven wrapper scripts are the reason this file exists: if `mvnw` is checked out with CRLF
+# on Windows and then committed, it stops running on Linux and macOS (and in CI) with the
+# famously unhelpful "bad interpreter" error.
+* text=auto eol=lf
+
+mvnw        text eol=lf
+*.sh        text eol=lf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+
+# Binary assets
+*.jar       binary
+*.png       binary
+*.jpg       binary
+*.gif       binary
+*.ico       binary

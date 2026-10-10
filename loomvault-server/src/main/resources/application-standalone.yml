@@ -1,0 +1,50 @@
+# =============================================================================================
+#  standalone profile — zero external dependencies
+#
+#  Run with:  java -jar loomvault-server/target/loomvault.jar --spring.profiles.active=standalone
+#  or:        mvn spring-boot:run -pl loomvault-server -Dspring-boot.run.profiles=standalone
+#
+#  Uses an in-memory H2 database and a process-local response cache, so no Docker is required.
+#  The full JDBC persistence path is still exercised — only the database engine changes.
+# =============================================================================================
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:loomvault;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      pool-name: loomvault-standalone
+      maximum-pool-size: 6
+      minimum-idle: 1
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # Redis is not used in this profile; the cache falls back to an in-process LRU.
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+loomvault:
+  store:
+    mode: jdbc
+  cache:
+    mode: memory
+    max-entries: 500
+  llm:
+    provider: mock
+    mock:
+      # Snappier than the docker profile: this mode is used for interactive poking.
+      min-latency: 40ms
+      max-latency: 140ms
+  engine:
+    max-parallel-nodes: 4
+
+logging:
+  level:
+    io.loomvault: INFO
+    org.flywaydb: WARN

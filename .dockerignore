@@ -1,0 +1,51 @@
+# =============================================================================================
+#  Build context filter for LoomVault.
+#  Keep the context small and reproducible — never exclude sources or POM files.
+# =============================================================================================
+
+# ---- Build output (rebuilt inside the image) ----
+target/
+**/target/
+
+# ---- Version control / CI ----
+.git/
+.gitignore
+.github/
+
+# ---- Documentation (not needed to build) ----
+docs/
+*.md
+
+# ---- IDE / editor files ----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+*.swp
+
+# ---- OS noise ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- Runtime / local artefacts ----
+.lvtest/
+logs/
+*.log
+*.pid
+*.hprof
+data/
+.env
+.env.*
+!.env.example
+
+# ---- Deploy assets (the app image does not need the compose file) ----
+deploy/
+examples/
+
+# ---- License text is not required at build time ----
+LICENSE

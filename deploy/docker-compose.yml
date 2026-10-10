@@ -1,0 +1,93 @@
+# =============================================================================================
+#  LoomVault — one-command local stack: PostgreSQL + Redis + the application.
+#
+#  Start :  docker compose -f deploy/docker-compose.yml up --build
+#  Stop  :  docker compose -f deploy/docker-compose.yml down
+#
+#  On first boot against an empty database the app automatically loads the 3 bundled sample
+#  workflows and runs one demo execution (support-triage), so the control room is never empty:
+#  open http://localhost:8080/ once the `loomvault` container reports healthy.
+#
+#  Every host port can be overridden from the environment (see the ${...:-default} below).
+# =============================================================================================
+name: loomvault
+
+# Shared healthcheck timing, merged into each service so the values stay in one place.
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 10s
+
+services:
+
+  # -------------------------------------------------------------------------------------------
+  # PostgreSQL — durable execution repository (Flyway migrates the schema on first connect).
+  # -------------------------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: loomvault
+      POSTGRES_USER: loomvault
+      POSTGRES_PASSWORD: loomvault
+    ports:
+      - "${LOOMVAULT_DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "pg_isready -U loomvault -d loomvault"]
+
+  # -------------------------------------------------------------------------------------------
+  # Redis — shared response cache (required for multi-instance deployments; optional otherwise).
+  # -------------------------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${LOOMVAULT_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "ping"]
+
+  # -------------------------------------------------------------------------------------------
+  # LoomVault server — built from the repository root Dockerfile.
+  # -------------------------------------------------------------------------------------------
+  loomvault:
+    build:
+      # Context is the project root so every module (core/llm/store/server) is available.
+      context: ..
+      dockerfile: Dockerfile
+    image: loomvault:latest
+    # The app must exit cleanly on shutdown; only restart it after an actual failure.
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${LOOMVAULT_PORT:-8080}:8080"
+    environment:
+      # Database — the host is the compose service name, never localhost.
+      LOOMVAULT_DB_URL: jdbc:postgresql://postgres:5432/loomvault
+      LOOMVAULT_DB_USER: loomvault
+      LOOMVAULT_DB_PASSWORD: loomvault
+      # Redis cache.
+      LOOMVAULT_REDIS_HOST: redis
+      LOOMVAULT_REDIS_PORT: "6379"
+      # Built-in offline mock provider: a fresh clone runs with no API key.
+      LOOMVAULT_LLM_PROVIDER: mock
+      # Concurrency cap on in-flight model calls.
+      LOOMVAULT_MAX_PARALLEL: "4"
+    healthcheck:
+      # busybox wget ships with the alpine runtime image, so no curl is required.
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  postgres-data:

@@ -1,0 +1,158 @@
+# =============================================================================================
+#  LoomVault — default configuration
+#
+#  This profile expects PostgreSQL and Redis, which is exactly what `docker compose up` provides.
+#  For a zero-dependency local run use: --spring.profiles.active=standalone
+# =============================================================================================
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  compression:
+    enabled: true
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  application:
+    name: loomvault
+
+  # Java 21 virtual threads: every blocking model call runs on a virtual thread, so the
+  # parallelism cap is enforced by the scheduler rather than by a thread pool size.
+  threads:
+    virtual:
+      enabled: true
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+  datasource:
+    url: ${LOOMVAULT_DB_URL:jdbc:postgresql://localhost:5432/loomvault}
+    username: ${LOOMVAULT_DB_USER:loomvault}
+    password: ${LOOMVAULT_DB_PASSWORD:loomvault}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: loomvault-pool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+      # Long enough to survive a database restart, short enough to fail a dead connection.
+      max-lifetime: 1800000
+      keepalive-time: 120000
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  data:
+    redis:
+      host: ${LOOMVAULT_REDIS_HOST:localhost}
+      port: ${LOOMVAULT_REDIS_PORT:6379}
+      timeout: 2s
+      connect-timeout: 2s
+
+# ---------------------------------------------------------------------------------------------
+# Engine configuration
+# ---------------------------------------------------------------------------------------------
+loomvault:
+
+  engine:
+    # Upper bound on concurrently executing nodes. This is the single most effective protection
+    # for the model provider: it caps in-flight requests instead of rejecting them after the fact.
+    max-parallel-nodes: ${LOOMVAULT_MAX_PARALLEL:4}
+    default-max-attempts: 2
+    # How often the scheduler wakes to re-check cancellation and budget while waiting.
+    poll-interval: 200ms
+    hard-timeout-slack: 30s
+    # Recover executions left RUNNING by a previous process (see docs/RECOVERY.md).
+    recover-on-startup: true
+
+  store:
+    # jdbc | memory — memory is for tests and throwaway demos only
+    mode: ${LOOMVAULT_STORE_MODE:jdbc}
+
+  cache:
+    # redis | memory — redis is required for multi-instance deployments
+    mode: ${LOOMVAULT_CACHE_MODE:redis}
+    ttl: 6h
+    max-entries: 2000
+    # Only temperature-0 calls are cached by default; see CachingLlmGateway.
+    cache-non-deterministic: false
+
+  llm:
+    # mock | openai — mock is the default so that a fresh clone runs with no API key
+    provider: ${LOOMVAULT_LLM_PROVIDER:mock}
+    openai:
+      base-url: ${LOOMVAULT_LLM_OPENAI_BASE_URL:https://api.openai.com/v1}
+      api-key: ${LOOMVAULT_LLM_OPENAI_API_KEY:}
+      timeout: 60s
+    mock:
+      min-latency: 120ms
+      max-latency: 420ms
+      # Set to 2 to watch the retry path light up in the UI on the first two calls.
+      fail-first-calls: 0
+    resilience:
+      failure-threshold: 5
+      open-duration: 30s
+      max-attempts: 2
+
+  workflows:
+    load-samples: true
+    # Seeding one demo run means the control room is never empty on first open.
+    run-demo-on-startup: true
+    demo-workflow-id: support-triage
+    demo-input-ticket: TCK-1001
+    # Both .yaml and .json definitions are loaded; YAML is preferred for multi-line prompts.
+    location: classpath:workflows/*
+
+  pricing:
+    # Override or add prices (USD per million tokens). Anything not listed falls back to the
+    # built-in table; unknown models are priced at zero rather than guessed.
+    overrides: {}
+    #  overrides:
+    #    my-local-model:
+    #      input-per-million: "0.00"
+    #      output-per-million: "0.00"
+
+# ---------------------------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: loomvault
+    distribution:
+      percentiles-histogram:
+        loomvault.executions.duration: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    io.loomvault: INFO
+  pattern:
+    # traceId is set per HTTP request; executionId and nodeId are already part of every engine
+    # log message ("execution.started id=exe_..."), so the pattern only needs the request id.
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{traceId:------------}] %logger{30} - %msg%n"

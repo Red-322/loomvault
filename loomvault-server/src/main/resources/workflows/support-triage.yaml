@@ -1,0 +1,210 @@
+# =============================================================================================
+#  Support Ticket Triage — the flagship example.
+#
+#  Demonstrates, in one small graph:
+#    * tool nodes reading a dataset            (fetch_ticket, load_customer)
+#    * parallel LLM fan-out                    (classify  ‖  score_risk)
+#    * fan-in with merged context              (draft_reply)
+#    * human-in-the-loop approval              (approve_reply)
+#    * side-effecting tools after approval     (notify, record_outcome)
+#    * a workflow-level token budget           (budget.onExceed = DEGRADE)
+#
+#  Run it:  curl -s -X POST localhost:8080/api/executions?wait=true \
+#             -H 'Content-Type: application/json' \
+#             -d '{"workflowId":"support-triage","inputs":{"ticketId":"TCK-1001"}}'
+# =============================================================================================
+id: support-triage
+name: Support Ticket Triage
+version: "1"
+description: >
+  Reads a support ticket and its customer record, classifies the ticket and scores its risk in
+  parallel, drafts a reply, pauses for human approval, then notifies the customer and records
+  the outcome. The approval step is what makes this a supervised agent rather than a batch job.
+
+budget:
+  maxTotalTokens: 24000
+  maxLlmCalls: 12
+  maxCostUsd: "0.75"
+  # Crossing the budget downgrades model calls instead of killing the run.
+  onExceed: DEGRADE
+  warnThreshold: 0.75
+
+nodes:
+
+  # ---- ingest ------------------------------------------------------------------------------
+
+  - id: fetch_ticket
+    name: Fetch ticket
+    kind: TOOL
+    idempotent: true
+    timeout: PT10S
+    config:
+      tool: fetch_ticket
+      args:
+        ticketId: ${inputs.ticketId}
+
+  - id: load_customer
+    name: Load customer
+    kind: TOOL
+    idempotent: true
+    timeout: PT10S
+    config:
+      tool: lookup_customer
+      args:
+        customerId: ${nodes.fetch_ticket.customerId}
+
+  # ---- parallel analysis -------------------------------------------------------------------
+
+  - id: classify
+    name: Classify ticket
+    kind: LLM
+    timeout: PT45S
+    retry:
+      maxAttempts: 3
+      initialBackoff: PT0.3S
+      multiplier: 2.0
+      jitterRatio: 0.15
+    config:
+      model: mock-fast
+      fallbackModel: mock-fast
+      temperature: 0
+      outputFormat: json
+      system: You are a precise support triage classifier. Answer with JSON only.
+      prompt: |
+        Classify the support ticket below.
+
+        Reply with a JSON object containing exactly these fields:
+          category   one of billing | technical | account | shipping | other
+          sentiment  one of negative | neutral | positive
+          confidence integer 0-100
+          urgent     boolean
+          reason     one short sentence
+
+        Subject: ${nodes.fetch_ticket.subject}
+        Body: ${nodes.fetch_ticket.body}
+        Customer tier: ${nodes.load_customer.tier}
+
+  - id: score_risk
+    name: Score risk
+    kind: LLM
+    timeout: PT45S
+    retry:
+      maxAttempts: 3
+      initialBackoff: PT0.3S
+      multiplier: 2.0
+      jitterRatio: 0.15
+    config:
+      model: mock-fast
+      fallbackModel: mock-fast
+      temperature: 0
+      outputFormat: json
+      system: You assess commercial and reputational risk for support tickets.
+      prompt: |
+        Assess the risk of the ticket below and reply with JSON only.
+
+        Fields:
+          overall   integer 40-100
+          clarity   integer 40-100
+          depth     integer 40-100
+          pass      boolean, true when overall >= 60
+          verdict   one of strong | adequate | weak
+          rationale one short sentence
+
+        Subject: ${nodes.fetch_ticket.subject}
+        Body: ${nodes.fetch_ticket.body}
+        Customer: ${nodes.load_customer.name} (tier ${nodes.load_customer.tier},
+        lifetime value ${nodes.load_customer.lifetimeValueUsd})
+        Reported priority: ${nodes.fetch_ticket.priority}
+
+  # ---- drafting ----------------------------------------------------------------------------
+
+  - id: draft_reply
+    name: Draft customer reply
+    kind: LLM
+    timeout: PT45S
+    retry:
+      maxAttempts: 2
+      initialBackoff: PT0.5S
+      multiplier: 2.0
+      jitterRatio: 0.2
+    config:
+      model: mock-fast
+      fallbackModel: mock-fast
+      temperature: 0
+      system: You write short, warm and specific customer support replies. Never over-promise.
+      prompt: |
+        Draft a reply to the customer for the ticket below.
+
+        Ticket subject: ${nodes.fetch_ticket.subject}
+        Customer: ${nodes.load_customer.name} — ${nodes.load_customer.tier} tier
+        Category: ${nodes.classify.category}
+        Urgent: ${nodes.classify.urgent}
+        Risk score: ${nodes.score_risk.overall} (${nodes.score_risk.verdict})
+
+        Acknowledge the issue, state what happens next, and give one concrete timeframe.
+
+  # ---- human in the loop -------------------------------------------------------------------
+
+  - id: approve_reply
+    name: Approve reply
+    kind: APPROVAL
+    timeout: P7D
+    config:
+      summary: >
+        Reply drafted for ${nodes.fetch_ticket.subject}
+        — category ${nodes.classify.category},
+        risk ${nodes.score_risk.overall} (${nodes.classify.confidence}% classification confidence).
+        Draft: ${nodes.draft_reply.text}
+      details: Customer ${nodes.load_customer.name} is a ${nodes.load_customer.tier} account.
+      assignee: support-lead
+
+  # ---- side effects (only run after approval) ----------------------------------------------
+
+  - id: notify_customer
+    name: Notify customer
+    kind: TOOL
+    # Marked non-idempotent on purpose: this is exactly the node whose re-execution after a
+    # crash the engine warns about in the journal.
+    idempotent: false
+    timeout: PT15S
+    config:
+      tool: notify
+      args:
+        ticketId: ${inputs.ticketId}
+        channel: email
+        message: ${nodes.draft_reply.text}
+
+  - id: record_outcome
+    name: Record outcome
+    kind: TOOL
+    idempotent: false
+    timeout: PT15S
+    config:
+      tool: record_outcome
+      args:
+        ticketId: ${inputs.ticketId}
+        decision: approved
+        notes: risk=${nodes.score_risk.overall} category=${nodes.classify.category}
+
+edges:
+  - from: fetch_ticket
+    to: load_customer
+
+  # Fan-out: both analyses start as soon as the customer record is available.
+  - from: load_customer
+    to: classify
+  - from: load_customer
+    to: score_risk
+
+  # Fan-in: the draft waits for both, and reads both.
+  - from: classify
+    to: draft_reply
+  - from: score_risk
+    to: draft_reply
+
+  - from: draft_reply
+    to: approve_reply
+  - from: approve_reply
+    to: notify_customer
+  - from: notify_customer
+    to: record_outcome

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.loomvault</groupId>
+        <artifactId>loomvault-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>loomvault-store</artifactId>
+    <name>LoomVault :: Store</name>
+    <description>
+        Durability layer: JdbcTemplate-backed execution repository and append-only journal store,
+        Flyway-managed schema that runs on both PostgreSQL and H2.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.loomvault</groupId>
+            <artifactId>loomvault-core</artifactId>
+        </dependency>
+
+        <!-- JdbcTemplate without pulling the whole Spring Boot autoconfiguration into a library module. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+        </dependency>
+
+        <!-- Schema migration -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <!-- JDBC drivers: PostgreSQL for production/one-command demo, H2 for standalone mode and tests. -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

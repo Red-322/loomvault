@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.loomvault</groupId>
+        <artifactId>loomvault-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>loomvault-core</artifactId>
+    <name>LoomVault :: Core</name>
+    <description>
+        Framework-free execution kernel: domain model, DAG scheduler built on Java 21 virtual threads,
+        append-only replay journal, budget ledger, retry policies and a hand-written expression engine.
+    </description>
+
+    <dependencies>
+        <!-- JSON is the wire format of the journal and of every node payload. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- java.time (Instant, Duration) serialisation for records and journal payloads. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- Logging facade only; the concrete binding is chosen by the application module. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

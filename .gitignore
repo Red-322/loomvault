@@ -1,0 +1,51 @@
+# ---- Java / Maven ----
+target/
+*.class
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/*.jar
+
+# ---- IDE ----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+*.swp
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- Logs / runtime ----
+logs/
+*.log
+*.pid
+*.hprof
+
+# ---- Local environment ----
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+
+# ---- Local data volumes ----
+data/
+docker/volumes/
+
+# ---- Node (frontend tooling, if any) ----
+node_modules/
+dist/
+.vite/
+
+# ---- Test / coverage ----
+**/target/surefire-reports/
+**/target/failsafe-reports/
+jacoco.exec
+*.exec

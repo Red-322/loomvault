@@ -1,0 +1,124 @@
+# =============================================================================================
+#  Reliability Drill — the workflow to run when you want to watch the guardrails work.
+#
+#  Two things are deliberately hostile here:
+#    1. retry.maxAttempts = 3 on every LLM node, so setting
+#       loomvault.llm.mock.fail-first-calls=2 makes the first two attempts fail and the journal
+#       show NODE_FAILED -> NODE_RETRY_SCHEDULED -> NODE_STARTED -> NODE_COMPLETED.
+#    2. a tight token budget (900) that a single fan-out crosses, so the DEGRADE strategy fires
+#       and the run continues on the fallback model instead of dying.
+#
+#  Run it:  curl -s -X POST localhost:8080/api/executions?wait=true \
+#             -H 'Content-Type: application/json' \
+#             -d '{"workflowId":"reliability-drill","inputs":{"subject":"quarterly report"}}'
+#  Then read the journal:
+#           curl -s localhost:8080/api/executions/<id>/journal | head -60
+# =============================================================================================
+id: reliability-drill
+name: Reliability Drill
+version: "1"
+description: >
+  Four parallel model calls under a deliberately small budget, each with three retries. Use it to
+  observe retry/backoff, budget degradation, circuit breaking and journal-based recovery without
+  needing a real provider to misbehave.
+
+budget:
+  maxTotalTokens: 900
+  maxLlmCalls: 10
+  onExceed: DEGRADE
+  warnThreshold: 0.6
+
+nodes:
+
+  - id: angle_business
+    name: Business angle
+    kind: LLM
+    timeout: PT30S
+    retry:
+      maxAttempts: 3
+      initialBackoff: PT0.2S
+      multiplier: 2.0
+      jitterRatio: 0.3
+    config:
+      model: mock-frontier
+      # Honoured only once the budget guard degrades the run.
+      fallbackModel: mock-fast
+      temperature: 0
+      prompt: |
+        Write two sentences on the business angle of: ${inputs.subject}
+
+  - id: angle_technical
+    name: Technical angle
+    kind: LLM
+    timeout: PT30S
+    retry:
+      maxAttempts: 3
+      initialBackoff: PT0.2S
+      multiplier: 2.0
+      jitterRatio: 0.3
+    config:
+      model: mock-frontier
+      fallbackModel: mock-fast
+      temperature: 0
+      prompt: |
+        Write two sentences on the technical angle of: ${inputs.subject}
+
+  - id: angle_risk
+    name: Risk angle
+    kind: LLM
+    timeout: PT30S
+    retry:
+      maxAttempts: 3
+      initialBackoff: PT0.2S
+      multiplier: 2.0
+      jitterRatio: 0.3
+    config:
+      model: mock-frontier
+      fallbackModel: mock-fast
+      temperature: 0
+      prompt: |
+        Write two sentences on the risk angle of: ${inputs.subject}
+
+  - id: angle_people
+    name: People angle
+    kind: LLM
+    timeout: PT30S
+    retry:
+      maxAttempts: 3
+      initialBackoff: PT0.2S
+      multiplier: 2.0
+      jitterRatio: 0.3
+    config:
+      model: mock-frontier
+      fallbackModel: mock-fast
+      temperature: 0
+      prompt: |
+        Write two sentences on the people and process angle of: ${inputs.subject}
+
+  - id: synthesis
+    name: Synthesis
+    kind: LLM
+    timeout: PT45S
+    config:
+      model: mock-fast
+      temperature: 0
+      outputFormat: json
+      prompt: |
+        Combine the four angles below into a briefing.
+
+        Reply with JSON: headline (string), themes (array of strings), confidence (0-100).
+
+        Business: ${nodes.angle_business.text}
+        Technical: ${nodes.angle_technical.text}
+        Risk: ${nodes.angle_risk.text}
+        People: ${nodes.angle_people.text}
+
+edges:
+  - from: angle_business
+    to: synthesis
+  - from: angle_technical
+    to: synthesis
+  - from: angle_risk
+    to: synthesis
+  - from: angle_people
+    to: synthesis

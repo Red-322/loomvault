@@ -1,0 +1,77 @@
+# =============================================================================================
+#  LoomVault — continuous integration.
+#
+#  build : compile + run the full test suite on Java 21 (matrix), publish surefire reports.
+#  docker: after build, verify the Dockerfile still builds (main branch only, no push).
+# =============================================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel any in-flight run for the same branch/PR when a new commit arrives.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the workflow only needs to read the repository.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & test (Java ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [21]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      # `verify` compiles, runs unit/integration tests and packages every module.
+      - name: Build and verify
+        run: mvn -B -ntp verify
+
+      # Keep the test reports even when the build fails, so failures can be inspected.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: '**/target/surefire-reports/'
+          if-no-files-found: ignore
+          retention-days: 7
+
+  docker:
+    name: Docker build (main only)
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the image to prove the Dockerfile is valid; do not push anywhere.
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: loomvault:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

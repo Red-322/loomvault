@@ -1,0 +1,175 @@
+# =============================================================================================
+#  Content Review — conditional routing example.
+#
+#  Three reviewers score a draft in parallel; the aggregated verdict decides the branch. This is
+#  the graph to read when you want to understand how LoomVault does fan-out, fan-in and routing
+#  without a separate "router" node type: routing is just conditional edges over node outputs.
+#
+#  Run it:  curl -s -X POST localhost:8080/api/executions?wait=true \
+#             -H 'Content-Type: application/json' \
+#             -d '{"workflowId":"content-review","inputs":{"draft":"..."}}'
+# =============================================================================================
+id: content-review
+name: Content Review Pipeline
+version: "1"
+description: >
+  Scores a draft along three independent axes in parallel, aggregates the verdict, then routes
+  to either publish-ready or needs-revision. Both branches are terminal, so the execution always
+  produces exactly one meaningful output.
+
+budget:
+  maxTotalTokens: 16000
+  maxLlmCalls: 8
+  onExceed: FAIL
+  warnThreshold: 0.8
+
+nodes:
+
+  - id: prepare
+    name: Prepare draft
+    kind: TOOL
+    idempotent: true
+    timeout: PT5S
+    config:
+      tool: text_stats
+      args:
+        text: ${inputs.draft}
+
+  - id: review_clarity
+    name: Review clarity
+    kind: LLM
+    timeout: PT40S
+    retry:
+      maxAttempts: 2
+      initialBackoff: PT0.25S
+      multiplier: 2.0
+      jitterRatio: 0.2
+    config:
+      model: mock-fast
+      temperature: 0
+      outputFormat: json
+      system: You are a demanding copy editor.
+      prompt: |
+        Score the clarity of the draft below.
+
+        Reply with JSON: overall (0-100), pass (boolean), rationale (one sentence).
+
+        Draft:
+        ${inputs.draft}
+
+  - id: review_depth
+    name: Review depth
+    kind: LLM
+    timeout: PT40S
+    retry:
+      maxAttempts: 2
+      initialBackoff: PT0.25S
+      multiplier: 2.0
+      jitterRatio: 0.2
+    config:
+      model: mock-fast
+      temperature: 0
+      outputFormat: json
+      system: You are a subject-matter reviewer who values evidence over adjectives.
+      prompt: |
+        Score the technical depth of the draft below.
+
+        Reply with JSON: overall (0-100), pass (boolean), rationale (one sentence).
+
+        Draft:
+        ${inputs.draft}
+
+  - id: review_actionability
+    name: Review actionability
+    kind: LLM
+    timeout: PT40S
+    retry:
+      maxAttempts: 2
+      initialBackoff: PT0.25S
+      multiplier: 2.0
+      jitterRatio: 0.2
+    config:
+      model: mock-fast
+      temperature: 0
+      outputFormat: json
+      system: You review whether a reader knows what to do after reading.
+      prompt: |
+        Score how actionable the draft below is.
+
+        Reply with JSON: overall (0-100), pass (boolean), rationale (one sentence).
+
+        Draft:
+        ${inputs.draft}
+
+  - id: aggregate
+    name: Aggregate verdict
+    kind: LLM
+    timeout: PT40S
+    config:
+      model: mock-fast
+      temperature: 0
+      outputFormat: json
+      system: You aggregate review scores with equal weights.
+      prompt: |
+        Aggregate the three review scores below into a single verdict.
+
+        Reply with JSON:
+          overall      integer 0-100
+          pass         boolean, true when overall >= 60
+          verdict      one of strong | adequate | weak
+          needsRevision boolean, the opposite of pass
+          summary      two sentences
+          clarity      ${nodes.review_clarity.overall}
+          depth        ${nodes.review_depth.overall}
+          actionability ${nodes.review_actionability.overall}
+
+  - id: publish_ready
+    name: Mark publish-ready
+    kind: LLM
+    timeout: PT30S
+    config:
+      model: mock-fast
+      temperature: 0
+      prompt: |
+        The draft passed review with an overall score of ${nodes.aggregate.overall}.
+
+        Write a short publish checklist for the author, three bullets maximum.
+        Draft word count: ${nodes.prepare.words}
+
+  - id: needs_revision
+    name: Write revision brief
+    kind: LLM
+    timeout: PT30S
+    config:
+      model: mock-fast
+      temperature: 0
+      prompt: |
+        The draft scored ${nodes.aggregate.overall} and needs revision.
+
+        Write a concise revision brief: the two weakest axes and one concrete fix each.
+        Clarity ${nodes.review_clarity.overall}, depth ${nodes.review_depth.overall},
+        actionability ${nodes.review_actionability.overall}.
+
+edges:
+  - from: prepare
+    to: review_clarity
+  - from: prepare
+    to: review_depth
+  - from: prepare
+    to: review_actionability
+
+  - from: review_clarity
+    to: aggregate
+  - from: review_depth
+    to: aggregate
+  - from: review_actionability
+    to: aggregate
+
+  # Conditional routing: exactly one of these two edges can fire, because their conditions are
+  # mutually exclusive. Edges that are not taken propagate a skip down their branch.
+  - from: aggregate
+    to: publish_ready
+    condition: nodes.aggregate.pass == true
+  - from: aggregate
+    to: needs_revision
+    condition: nodes.aggregate.pass == false
