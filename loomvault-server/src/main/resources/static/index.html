@@ -1,121 +1,161 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LoomVault — Durable Agent Execution Control Room</title>
+    <meta name="color-scheme" content="dark light">
+    <title>LoomVault · Execution Control Room</title>
     <link rel="stylesheet" href="/styles.css">
-    <link rel="icon"
-          href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M9 10h14M9 16h14M9 22h9' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Cpath d='M10 21V11l6 6 6-6v10' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 </head>
 <body>
 
-<header class="topbar">
-    <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-            <rect width="32" height="32" rx="7" fill="#4f46e5"/>
-            <path d="M9 10h14M9 16h14M9 22h9" stroke="white" stroke-width="2.4" stroke-linecap="round"/>
-        </svg>
-        <div>
-            <h1>LoomVault</h1>
-            <p class="tagline">Durable execution for AI agent workflows</p>
-        </div>
-    </div>
+<div class="app">
 
-    <div class="system-facts" id="system-facts">
-        <span class="fact skeleton">loading…</span>
-    </div>
-</header>
-
-<main class="layout">
-
-    <!-- ── Left rail: workflows and run history ────────────────────────────────────────── -->
-    <aside class="rail">
-
-        <section class="panel">
-            <h2 class="panel-title">
-                Workflows
-                <span class="count" id="workflow-count">0</span>
-            </h2>
-            <ul class="workflow-list" id="workflow-list">
-                <li class="empty">No workflows registered</li>
-            </ul>
-        </section>
-
-        <section class="panel grow">
-            <h2 class="panel-title">
-                Runs
-                <button class="icon-btn" id="refresh-runs" title="Refresh">↻</button>
-            </h2>
-            <ul class="run-list" id="run-list">
-                <li class="empty">No runs yet</li>
-            </ul>
-        </section>
-
-    </aside>
-
-    <!-- ── Main stage: graph, metrics, timeline ────────────────────────────────────────── -->
-    <section class="stage" id="stage">
-
-        <div class="empty-state" id="empty-state">
-            <svg viewBox="0 0 64 64" aria-hidden="true">
-                <rect x="8" y="14" width="18" height="12" rx="3" fill="#c7d2fe"/>
-                <rect x="38" y="14" width="18" height="12" rx="3" fill="#c7d2fe"/>
-                <rect x="23" y="40" width="18" height="12" rx="3" fill="#a5b4fc"/>
-                <path d="M17 26v8h30v-8M32 34v6" stroke="#818cf8" stroke-width="2" fill="none"/>
-            </svg>
-            <h3>Pick a run to inspect</h3>
-            <p>Every execution keeps a replayable journal. Start one below, then watch the graph, the
-                budget and the event timeline fill in live.</p>
-            <button class="primary" id="empty-run-demo">Run the demo workflow</button>
+    <!-- ══ Top bar ══════════════════════════════════════════════════════════════════════════ -->
+    <header class="appbar">
+        <div class="appbar-brand">
+            <div class="logo">
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                    <path d="M10 21V11l6 6 6-6v10" stroke="currentColor" stroke-width="2.6"
+                          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+            </div>
+            <div class="brand-copy">
+                <span class="brand-name">LoomVault</span>
+                <span class="brand-tag" data-i18n="brand.tagline">持久化执行引擎</span>
+            </div>
         </div>
 
-        <div class="run-detail hidden" id="run-detail">
+        <div class="appbar-facts" id="appbar-facts">
+            <span class="skeleton-line w120"></span>
+            <span class="skeleton-line w90"></span>
+        </div>
 
-            <div class="run-head">
-                <div class="run-head-main">
-                    <h2 id="run-title">—</h2>
-                    <div class="run-sub" id="run-sub">—</div>
-                    <code class="run-id" id="run-id">—</code>
+        <div class="appbar-tools">
+            <button class="ghostbtn" id="refresh-btn" data-i18n-title="action.refresh">
+                <svg viewBox="0 0 16 16" class="ic"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3.2h-3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span data-i18n="action.refresh">刷新</span>
+            </button>
+            <button class="iconbtn" id="theme-btn" data-i18n-title="action.theme">
+                <svg viewBox="0 0 16 16" class="ic ic-sun"><circle cx="8" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v1.6M8 13.4V15M15 8h-1.6M2.6 8H1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1M12.9 12.9l-1.1-1.1M4.2 4.2L3.1 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <svg viewBox="0 0 16 16" class="ic ic-moon"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="langbtn" id="lang-btn">EN</button>
+        </div>
+    </header>
+
+    <!-- ══ Body ═════════════════════════════════════════════════════════════════════════════ -->
+    <div class="shell">
+
+        <!-- ── Sidebar ────────────────────────────────────────────────────────────────── -->
+        <aside class="sidebar">
+
+            <section class="side-block">
+                <div class="side-head">
+                    <h2 data-i18n="side.runs">执行记录</h2>
+                    <span class="pill" id="run-count">0</span>
                 </div>
-                <div class="run-actions" id="run-actions"></div>
-            </div>
-
-            <div class="metrics" id="metrics"></div>
-
-            <div class="panels">
-                <section class="panel">
-                    <h2 class="panel-title">Execution graph <span class="hint" id="dag-hint"></span></h2>
-                    <div class="dag-wrap">
-                        <svg class="dag" id="dag" xmlns="http://www.w3.org/2000/svg"></svg>
-                    </div>
-                </section>
-
-                <section class="panel">
-                    <h2 class="panel-title">
-                        Journal
-                        <span class="hint" id="journal-count"></span>
-                    </h2>
-                    <ol class="timeline" id="timeline">
-                        <li class="empty">No events</li>
-                    </ol>
-                </section>
-            </div>
-
-            <section class="panel">
-                <h2 class="panel-title">Node detail <span class="hint">click a node above</span></h2>
-                <div class="node-detail" id="node-detail">
-                    <p class="empty">Nothing selected.</p>
+                <div class="side-scroll" id="run-list">
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
                 </div>
             </section>
 
-        </div>
+            <section class="side-block side-block--grow">
+                <div class="side-head">
+                    <h2 data-i18n="side.workflows">工作流</h2>
+                    <span class="pill" id="workflow-count">0</span>
+                </div>
+                <div class="side-scroll" id="workflow-list"></div>
+            </section>
 
-    </section>
+        </aside>
 
-</main>
+        <!-- ── Content ────────────────────────────────────────────────────────────────── -->
+        <main class="content" id="content">
 
-<div class="toast-stack" id="toasts"></div>
+            <!-- Welcome / empty state -->
+            <div class="welcome" id="welcome">
+                <div class="welcome-art">
+                    <svg viewBox="0 0 120 80" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="wg1" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/>
+                            </linearGradient>
+                        </defs>
+                        <rect x="6" y="26" width="30" height="20" rx="6" fill="url(#wg1)" opacity=".95"/>
+                        <rect x="84" y="12" width="30" height="20" rx="6" fill="url(#wg1)" opacity=".5"/>
+                        <rect x="84" y="48" width="30" height="20" rx="6" fill="url(#wg1)" opacity=".3"/>
+                        <rect x="45" y="36" width="30" height="20" rx="6" fill="url(#wg1)" opacity=".75"/>
+                        <path d="M36 36h9M75 36h9M75 36c0-14 4-16 9-16M75 42c0 14 4 16 9 16"
+                              stroke="#6366f1" stroke-width="1.6" fill="none" opacity=".45"/>
+                    </svg>
+                </div>
+                <h2 data-i18n="welcome.title">选择一条执行记录开始</h2>
+                <p data-i18n="welcome.body">每次执行都保留了完整的可重放日志。启动一条新执行，或从左侧挑一条历史记录——执行图、预算和事件时间轴会实时填充。</p>
+                <button class="primarybtn" id="welcome-run">
+                    <svg viewBox="0 0 16 16" class="ic"><path d="M4.5 2.8v10.4l8.2-5.2z" fill="currentColor"/></svg>
+                    <span data-i18n="welcome.cta">运行演示工作流</span>
+                </button>
+            </div>
+
+            <!-- Run detail -->
+            <div class="detail is-hidden" id="detail">
+
+                <section class="hero">
+                    <div class="hero-main">
+                        <div class="hero-title-row">
+                            <h1 id="run-title">—</h1>
+                            <span class="statusbadge" id="run-status">—</span>
+                        </div>
+                        <div class="hero-meta" id="run-meta"></div>
+                        <code class="run-id" id="run-id">—</code>
+                    </div>
+                    <div class="hero-actions" id="run-actions"></div>
+                </section>
+
+                <section class="notice is-hidden" id="run-notice"></section>
+
+                <section class="stats" id="stats"></section>
+
+                <!-- The graph gets a full row: a six-column execution graph needs the width far
+                     more than the journal needs a side-by-side slot. -->
+                <section class="card card--graph">
+                    <header class="card-head">
+                        <h2 data-i18n="card.graph">执行图</h2>
+                        <div class="legend" id="graph-legend"></div>
+                    </header>
+                    <div class="graph-viewport" id="graph-viewport">
+                        <svg class="graph" id="graph" xmlns="http://www.w3.org/2000/svg"></svg>
+                    </div>
+                </section>
+
+                <div class="split">
+                    <section class="card card--log">
+                        <header class="card-head">
+                            <h2 data-i18n="card.journal">事件日志</h2>
+                            <span class="hint" id="journal-hint"></span>
+                        </header>
+                        <ol class="log" id="journal"></ol>
+                    </section>
+
+                    <section class="card">
+                        <header class="card-head">
+                            <h2 data-i18n="card.node">节点详情</h2>
+                            <span class="hint" data-i18n="card.node.hint">点击图中任意节点查看</span>
+                        </header>
+                        <div class="node-detail" id="node-detail"></div>
+                    </section>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
 
 <script type="module" src="/js/app.js"></script>
 </body>

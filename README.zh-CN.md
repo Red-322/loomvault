@@ -59,6 +59,8 @@ docker compose up --build
 
 打开 **http://localhost:8080** —— 三个示例工作流已经注册好了，还有一次 demo 运行正等着你审批。不需要 API Key，不需要任何配置。
 
+![LoomVault 控制台](docs/screenshot-console-zh.png)
+
 ### 本地运行，零依赖
 
 ```bash

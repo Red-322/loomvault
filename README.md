@@ -68,6 +68,8 @@ docker compose up --build
 Open **http://localhost:8080** — three example workflows are registered and one demo run is
 already waiting for your approval. No API key, no configuration.
 
+![LoomVault control room](docs/screenshot-console.png)
+
 > **Building from mainland China?** Pulling the base images and the Maven dependency tree can take
 > a very long time. The image build accepts a mirror argument:
 >
