@@ -34,6 +34,18 @@ spring:
       fail-on-unknown-properties: false
     default-property-inclusion: non_null
 
+  # Static assets ship with no Cache-Control header by default, so browsers fall back to
+  # heuristic caching: they guess a lifetime from Last-Modified and then stop asking the server
+  # at all. The visible symptom is "I changed the UI and nothing happened" — the application is
+  # serving the new files, the browser just never asks for them.
+  # `no-cache` does not mean "do not cache": it means "revalidate before use". An unchanged file
+  # costs a 304, a changed one is picked up on the very next load.
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+
   datasource:
     url: ${LOOMVAULT_DB_URL:jdbc:postgresql://localhost:5432/loomvault}
     username: ${LOOMVAULT_DB_USER:loomvault}
